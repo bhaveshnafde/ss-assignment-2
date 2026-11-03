@@ -1,0 +1,48 @@
+== Deployment check (compose)   2026-11-03T21:41:37+05:30
+
+== docker compose ps
+SERVICE                STATUS                   PORTS
+account-db             Up 4 minutes (healthy)   0.0.0.0:5434->5432/tcp, [::]:5434->5432/tcp
+account-service        Up 4 minutes (healthy)   0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+ledger-db              Up 4 minutes (healthy)   0.0.0.0:5435->5432/tcp, [::]:5435->5432/tcp
+ledger-service         Up 4 minutes (healthy)   0.0.0.0:8083->8083/tcp, [::]:8083->8083/tcp
+limits-db              Up 4 minutes (healthy)   0.0.0.0:5436->5432/tcp, [::]:5436->5432/tcp
+limits-service         Up 4 minutes (healthy)   0.0.0.0:8084->8084/tcp, [::]:8084->8084/tcp
+notification-db        Up 4 minutes (healthy)   0.0.0.0:5437->5432/tcp, [::]:5437->5432/tcp
+notification-service   Up 4 minutes (healthy)   0.0.0.0:8085->8085/tcp, [::]:8085->8085/tcp
+transfer-db            Up 4 minutes (healthy)   0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp
+transfer-service       Up 4 minutes (healthy)   0.0.0.0:8082->8082/tcp, [::]:8082->8082/tcp
+ui-service             Up 4 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+
+== 1. Every service answers /health (through the UI service, which calls each one over the network)
+  transfer: {"status":"UP","checks":{"database":"UP"},"service":"transfer-service"}
+  PASS  transfer is UP and its database is UP
+  account: {"service":"account-service","checks":{"database":"UP"},"status":"UP"}
+  PASS  account is UP and its database is UP
+  ledger: {"status":"UP","service":"ledger-service","checks":{"database":"UP"}}
+  PASS  ledger is UP and its database is UP
+  limits: {"checks":{"database":"UP"},"service":"limits-service","status":"UP"}
+  PASS  limits is UP and its database is UP
+  notification: {"status":"UP","checks":{"database":"UP"},"service":"notification-service"}
+  PASS  notification is UP and its database is UP
+
+== 2. Main workflow: a transfer of 100.00 INR from ACC-1001 to ACC-2002
+  ACC-1001 before: {"accountId":"ACC-1001","holderName":"Asha Rao","currency":"INR","balance":10000.00,"available":10000.00,"onHold":0.00,"status":"ACTIVE","createdAt":"2026-11-03T16:07:04.015671Z","updatedAt":"2026-11-03T16:07:04.015671Z"}
+  answer: HTTP 201 {"transferId":"88942917-ad2f-4ffe-bffe-a790b94be570","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T16:11:38.681715045Z","updatedAt":"2026-11-03T16:11:39.560967071Z"}
+  PASS  transfer accepted with 201
+  PASS  transfer COMPLETED
+
+== 3. Inter-service communication: the same transfer seen by every service
+  saga steps: "step":"LIMIT_RESERVATION","action":"EXECUTE","outcome":"SUCCEEDED" "step":"FUNDS_HOLD","action":"EXECUTE","outcome":"SUCCEEDED" "step":"LEDGER_JOURNAL","action":"EXECUTE","outcome":"SUCCEEDED" "step":"CAPTURE","action":"EXECUTE","outcome":"SUCCEEDED" "step":"NOTIFICATION","action":"EXECUTE","outcome":"SUCCEEDED" 
+  PASS  Transfer called the next service: LIMIT_RESERVATION succeeded
+  PASS  Transfer called the next service: FUNDS_HOLD succeeded
+  PASS  Transfer called the next service: LEDGER_JOURNAL succeeded
+  PASS  Transfer called the next service: CAPTURE succeeded
+  PASS  Limits has the reservation
+  PASS  Account captured the hold
+  PASS  Ledger recorded the journal
+  PASS  Notification sent the SMS
+  ACC-1001 after:  {"accountId":"ACC-1001","holderName":"Asha Rao","currency":"INR","balance":9900.00,"available":9900.00,"onHold":0.00,"status":"ACTIVE","createdAt":"2026-11-03T16:07:04.015671Z","updatedAt":"2026-11-03T16:11:39.537976Z"}
+
+== Result: 15 passed, 0 failed. transferId 88942917-ad2f-4ffe-bffe-a790b94be570, X-Request-ID deploy-check-1793722298
+   Find this request in the logs:  docker compose logs | grep deploy-check-1793722298

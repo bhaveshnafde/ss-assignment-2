@@ -1,0 +1,25 @@
+== Challenge 3C: saga with compensation   2026-11-03T23:02:57+05:30
+Account ACC-1001 BEFORE:
+{"accountId":"ACC-1001","holderName":"Asha Rao","currency":"INR","balance":9300.00,"available":9300.00,"onHold":0.00,"status":"ACTIVE","createdAt":"2026-11-03T16:07:04.015671Z","updatedAt":"2026-11-03T17:32:54.333897Z"}
+Ledger switched to fail journal posts (503)
+
+== POST /transfers (step 3 will fail)
+HTTP/1.1 503 
+{"error":{"code":"LEDGER_UNAVAILABLE","message":"ledger unavailable: POST /api/v1/journals returned HTTP 503 LEDGER_FORCED_FAILURE","requestId":"saga-demo-1793727177","details":[{"status":"FAILED","transferId":"2a7f961f-9fcb-4932-9fd9-329489651fbb"}]}}
+
+== Saga steps for transfer 2a7f961f-9fcb-4932-9fd9-329489651fbb (each step, then the undo in reverse order)
+[{"seq":16,"step":"LIMIT_RESERVATION","action":"EXECUTE","outcome":"SUCCEEDED","detail":null,"at":"2026-11-03T17:32:57.749149Z"},{"seq":17,"step":"FUNDS_HOLD","action":"EXECUTE","outcome":"SUCCEEDED","detail":null,"at":"2026-11-03T17:32:57.770868Z"},{"seq":18,"step":"LEDGER_JOURNAL","action":"EXECUTE","outcome":"UNAVAILABLE","detail":"ledger unavailable: POST /api/v1/journals returned HTTP 503 LEDGER_FORCED_FAILURE","at":"2026-11-03T17:32:58.367885Z"},{"seq":19,"step":"LEDGER_JOURNAL","action":"COMPENSATE","outcome":"SUCCEEDED","detail":null,"at":"2026-11-03T17:32:58.390193Z"},{"seq":20,"step":"FUNDS_HOLD","action":"COMPENSATE","outcome":"SUCCEEDED","detail":null,"at":"2026-11-03T17:32:58.415865Z"},{"seq":21,"step":"LIMIT_RESERVATION","action":"COMPENSATE","outcome":"SUCCEEDED","detail":null,"at":"2026-11-03T17:32:58.535168Z"}]
+
+== Final transfer state (expect FAILED)
+{"transferId":"2a7f961f-9fcb-4932-9fd9-329489651fbb","status":"FAILED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":250.00,"currency":"INR","notificationStatus":"PENDING","failure":{"code":"LEDGER_UNAVAILABLE","message":"ledger unavailable: POST /api/v1/journals returned HTTP 503 LEDGER_FORCED_FAILURE"},"createdAt":"2026-11-03T17:32:57.726846Z","updatedAt":"2026-11-03T17:32:58.538593Z"}
+
+== Account ACC-1001 AFTER (balance and available back to BEFORE; nothing on hold for this transfer)
+{"accountId":"ACC-1001","holderName":"Asha Rao","currency":"INR","balance":9300.00,"available":9300.00,"onHold":0.00,"status":"ACTIVE","createdAt":"2026-11-03T16:07:04.015671Z","updatedAt":"2026-11-03T17:32:58.399641Z"}
+
+== Hold for this transfer (expect RELEASED)
+{"transferId":"2a7f961f-9fcb-4932-9fd9-329489651fbb","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":250.00,"currency":"INR","status":"RELEASED","createdAt":"2026-11-03T17:32:57.763138Z","updatedAt":"2026-11-03T17:32:58.399640Z"}
+
+== Ledger for this transfer (expect 404 JOURNAL_NOT_FOUND: nothing was recorded)
+{"error":{"code":"JOURNAL_NOT_FOUND","message":"no journal for transfer 2a7f961f-9fcb-4932-9fd9-329489651fbb","requestId":"91c01519-9315-4a85-a066-826dfa0042ff","details":[]}}
+
+Logs for this run: grep for requestId saga-demo-1793727177 in each service's output.

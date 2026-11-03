@@ -1,0 +1,5 @@
+# Everything for the money transfer system lives in one namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: money-transfer

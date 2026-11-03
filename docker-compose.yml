@@ -1,0 +1,183 @@
+# The whole money transfer system: 6 services and 5 databases.
+#
+#   cp .env.example .env        then set the five passwords in .env
+#   docker compose up --build   build every image and start everything
+#
+# Start-up order is enforced with health checks: each database must answer pg_isready before
+# its service starts, and Transfer and the UI wait until the services they call are healthy.
+# Inside this network a service reaches another by its name (http://account-service:8081),
+# never by localhost.
+
+name: money-transfer
+
+x-java-service: &java-service
+  restart: unless-stopped
+  networks: [backend]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-postgres: &postgres
+  image: postgres:16-alpine
+  restart: unless-stopped
+  networks: [backend]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
+services:
+
+  # ---------------------------------------------------------------- databases (one per service)
+
+  transfer-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: transfer_db
+      POSTGRES_USER: transfer_user
+      POSTGRES_PASSWORD: ${TRANSFER_DB_PASSWORD:?Set TRANSFER_DB_PASSWORD in .env}
+    volumes: [transfer-db-data:/var/lib/postgresql/data]
+    ports: ["${TRANSFER_DB_HOST_PORT:-5433}:5432"]
+
+  account-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: account_user
+      POSTGRES_PASSWORD: ${ACCOUNT_DB_PASSWORD:?Set ACCOUNT_DB_PASSWORD in .env}
+    volumes: [account-db-data:/var/lib/postgresql/data]
+    ports: ["${ACCOUNT_DB_HOST_PORT:-5434}:5432"]
+
+  ledger-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: ledger_db
+      POSTGRES_USER: ledger_user
+      POSTGRES_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
+    volumes: [ledger-db-data:/var/lib/postgresql/data]
+    ports: ["${LEDGER_DB_HOST_PORT:-5435}:5432"]
+
+  limits-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: limits_db
+      POSTGRES_USER: limits_user
+      POSTGRES_PASSWORD: ${LIMITS_DB_PASSWORD:?Set LIMITS_DB_PASSWORD in .env}
+    volumes: [limits-db-data:/var/lib/postgresql/data]
+    ports: ["${LIMITS_DB_HOST_PORT:-5436}:5432"]
+
+  notification-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+    volumes: [notification-db-data:/var/lib/postgresql/data]
+    ports: ["${NOTIFICATION_DB_HOST_PORT:-5437}:5432"]
+
+  # ---------------------------------------------------------------- services
+
+  account-service:
+    <<: *java-service
+    build: ./account-service
+    image: money-transfer/account-service:${APP_VERSION:-1.0.0}
+    environment:
+      DB_URL: jdbc:postgresql://account-db:5432/account_db
+      DB_USERNAME: account_user
+      DB_PASSWORD: ${ACCOUNT_DB_PASSWORD:?Set ACCOUNT_DB_PASSWORD in .env}
+      HOLD_STRATEGY: ${HOLD_STRATEGY:-atomic}
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      account-db: { condition: service_healthy }
+    ports: ["8081:8081"]
+
+  ledger-service:
+    <<: *java-service
+    build: ./ledger-service
+    image: money-transfer/ledger-service:${APP_VERSION:-1.0.0}
+    environment:
+      DB_URL: jdbc:postgresql://ledger-db:5432/ledger_db
+      DB_USERNAME: ledger_user
+      DB_PASSWORD: ${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}
+      ADMIN_ENDPOINTS_ENABLED: ${ADMIN_ENDPOINTS_ENABLED:-true}
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      ledger-db: { condition: service_healthy }
+    ports: ["8083:8083"]
+
+  limits-service:
+    <<: *java-service
+    build: ./limits-service
+    image: money-transfer/limits-service:${APP_VERSION:-1.0.0}
+    environment:
+      DB_URL: jdbc:postgresql://limits-db:5432/limits_db
+      DB_USERNAME: limits_user
+      DB_PASSWORD: ${LIMITS_DB_PASSWORD:?Set LIMITS_DB_PASSWORD in .env}
+      VELOCITY_MAX_TRANSFERS: ${VELOCITY_MAX_TRANSFERS:-10}
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      limits-db: { condition: service_healthy }
+    ports: ["8084:8084"]
+
+  notification-service:
+    <<: *java-service
+    build: ./notification-service
+    image: money-transfer/notification-service:${APP_VERSION:-1.0.0}
+    environment:
+      DB_URL: jdbc:postgresql://notification-db:5432/notification_db
+      DB_USERNAME: notification_user
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+      ADMIN_ENDPOINTS_ENABLED: ${ADMIN_ENDPOINTS_ENABLED:-true}
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      notification-db: { condition: service_healthy }
+    ports: ["8085:8085"]
+
+  transfer-service:
+    <<: *java-service
+    build: ./transfer-service
+    image: money-transfer/transfer-service:${APP_VERSION:-1.0.0}
+    environment:
+      DB_URL: jdbc:postgresql://transfer-db:5432/transfer_db
+      DB_USERNAME: transfer_user
+      DB_PASSWORD: ${TRANSFER_DB_PASSWORD:?Set TRANSFER_DB_PASSWORD in .env}
+      # Other services by their Compose name, not localhost
+      ACCOUNT_SERVICE_URL: http://account-service:8081
+      LEDGER_SERVICE_URL: http://ledger-service:8083
+      LIMITS_SERVICE_URL: http://limits-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      transfer-db: { condition: service_healthy }
+      account-service: { condition: service_healthy }
+      ledger-service: { condition: service_healthy }
+      limits-service: { condition: service_healthy }
+      notification-service: { condition: service_healthy }
+    ports: ["8082:8082"]
+
+  ui-service:
+    <<: *java-service
+    build: ./ui-service
+    image: money-transfer/ui-service:${APP_VERSION:-1.0.0}
+    environment:
+      TRANSFER_SERVICE_URL: http://transfer-service:8082
+      ACCOUNT_SERVICE_URL: http://account-service:8081
+      LEDGER_SERVICE_URL: http://ledger-service:8083
+      LIMITS_SERVICE_URL: http://limits-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      LOG_FORMAT: ${LOG_FORMAT:-logstash}
+    depends_on:
+      transfer-service: { condition: service_healthy }
+    ports: ["8080:8080"]
+
+networks:
+  backend:
+    name: money-transfer-backend
+
+volumes:
+  transfer-db-data:
+  account-db-data:
+  ledger-db-data:
+  limits-db-data:
+  notification-db-data:

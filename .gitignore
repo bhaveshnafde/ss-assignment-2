@@ -1,0 +1,14 @@
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+
+# Build output and IDE files
+target/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Kubernetes secret with real values (only k8s/secrets.example.yaml is committed)
+k8s/secrets.yaml

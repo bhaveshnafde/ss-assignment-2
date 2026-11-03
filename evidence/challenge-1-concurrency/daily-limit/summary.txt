@@ -1,0 +1,7 @@
+== Limits concurrency   2026-11-03T23:02:51+05:30
+Account ACC-RACE-1793727171 given a daily limit of 500. Firing 25 reservations of 100 at once; room for 5.
+succeeded (201): 5
+refused   (422): 20
+
+== Limits afterwards (usedToday should equal the limit)
+{"accountId":"ACC-RACE-1793727171","day":"2026-11-03","dailyLimit":500.00,"perTransferLimit":500.00,"personal":true,"usedToday":500.00,"remaining":0.00,"recentTransfers":5,"velocityMaxTransfers":10,"velocityWindowSeconds":60}

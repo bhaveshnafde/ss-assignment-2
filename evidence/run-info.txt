@@ -1,0 +1,10 @@
+Collected: 2026-11-03T23:02:48+05:30
+Git commit: not a git checkout
+Machine: MINGW64_NT-10.0-26200 x86_64
+
+Service health at collection time:
+  :8082 {"status":"UP","checks":{"database":"UP"},"service":"transfer-service"}
+  :8081 {"service":"account-service","checks":{"database":"UP"},"status":"UP"}
+  :8083 {"status":"UP","service":"ledger-service","checks":{"database":"UP"}}
+  :8084 {"checks":{"database":"UP"},"service":"limits-service","status":"UP"}
+  :8085 {"status":"UP","checks":{"database":"UP"},"service":"notification-service"}

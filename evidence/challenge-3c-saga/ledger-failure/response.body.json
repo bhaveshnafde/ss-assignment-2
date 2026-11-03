@@ -1,0 +1,1 @@
+{"error":{"code":"LEDGER_UNAVAILABLE","message":"ledger unavailable: POST /api/v1/journals returned HTTP 503 LEDGER_FORCED_FAILURE","requestId":"saga-demo-1793727177","details":[{"status":"FAILED","transferId":"2a7f961f-9fcb-4932-9fd9-329489651fbb"}]}}

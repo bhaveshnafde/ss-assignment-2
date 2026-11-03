@@ -1,0 +1,16 @@
+== Velocity (fraud) rule   2026-11-03T23:02:52+05:30
+Sending 12 reservations of 1.00 from ACC-FRAUD-1793727172 as fast as possible:
+  #1 -> 201 
+  #2 -> 201 
+  #3 -> 201 
+  #4 -> 201 
+  #5 -> 201 
+  #6 -> 201 
+  #7 -> 201 
+  #8 -> 201 
+  #9 -> 201 
+  #10 -> 201 
+  #11 -> 422 "code":"VELOCITY_LIMIT"
+  #12 -> 422 "code":"VELOCITY_LIMIT"
+
+{"accountId":"ACC-FRAUD-1793727172","day":"2026-11-03","dailyLimit":200000.00,"perTransferLimit":100000.00,"personal":false,"usedToday":10.00,"remaining":199990.00,"recentTransfers":10,"velocityMaxTransfers":10,"velocityWindowSeconds":60}

@@ -1,0 +1,56 @@
+# Every value can be overridden with the environment variable named in ${...}.
+# Defaults are for local development; see .env.example.
+
+server:
+  port: ${PORT:8085}
+
+spring:
+  config:
+    # Local runs read KEY=value lines from a .env file next to pom.xml (copy .env.example).
+    # That file is in .gitignore and .dockerignore, so no password is ever committed or baked into an image.
+    import: optional:file:.env[.properties]
+  application:
+    name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5437/notification_db}
+    username: ${DB_USERNAME:notification_user}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (src/main/resources/db/migration)
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+notification:
+  provider:
+    # The simulated SMS/email provider (condition e: a dependency that can be slow or fail).
+    # Wait this long before answering. Above Transfer's 3000 ms read timeout, Transfer times out and retries.
+    delay-ms: ${NOTIFY_DELAY_MS:0}
+    # Share of sends that fail, 0.0 to 1.0 (0.5 = half fail at random)
+    fail-rate: ${NOTIFY_FAIL_RATE:0.0}
+    # Deterministic demo: the next N sends fail, then sending works again
+    fail-next: ${NOTIFY_FAIL_NEXT:0}
+  # Lets the provider settings above be changed at runtime via /api/v1/admin/provider (demo convenience)
+  admin-enabled: ${ADMIN_ENDPOINTS_ENABLED:true}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Structured JSON logs; MDC field requestId is included in every line.
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:logstash}
+  level:
+    com.moneytransfer: ${LOG_LEVEL:INFO}

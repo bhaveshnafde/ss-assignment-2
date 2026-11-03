@@ -1,0 +1,29 @@
+== Challenge 2: idempotency   2026-11-03T23:02:54+05:30
+Idempotency-Key: idem-demo-1793727174
+
+== 10 identical requests at the same moment
+parallel-01 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-02 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-03 status=201 replayed=false body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778407Z","updatedAt":"2026-11-03T17:32:54.348821673Z"}
+parallel-04 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-05 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-06 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-07 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-08 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-09 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+parallel-10 status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778Z","updatedAt":"2026-11-03T17:32:54.348822Z"}
+
+== Repeat after it finished (expect 201, replayed=true, identical body)
+repeat status=201 replayed=true body={"transferId":"01f5fdd9-0d05-485d-a658-35601f38c6f2","status":"COMPLETED","sourceAccountId":"ACC-1001","destinationAccountId":"ACC-2002","amount":100.00,"currency":"INR","notificationStatus":"PENDING","createdAt":"2026-11-03T17:32:54.189778407Z","updatedAt":"2026-11-03T17:32:54.348821673Z"}
+Replay is byte-identical to the original: NO
+
+== Same key, different amount (expect 422 IDEMPOTENCY_KEY_REUSED)
+different-body status=422 replayed=- body={"error":{"code":"IDEMPOTENCY_KEY_REUSED","message":"This Idempotency-Key was already used with a different request body","requestId":"idem-demo-1793727174-different-body","details":[]}}
+
+== Summary
+status codes:      10 201 
+originals (replayed=false): 1
+distinct transferIds returned: 1
+
+Check the database has ONE transfer for this key:
+  psql ... -c "SELECT id, status FROM transfers WHERE idempotency_key = 'idem-demo-1793727174';"

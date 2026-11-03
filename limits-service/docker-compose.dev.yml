@@ -1,0 +1,22 @@
+# Local development only: the Limits service's own PostgreSQL database.
+# docker compose -f docker-compose.dev.yml up -d
+#
+# Host port 5436, next to Transfer (5433), Account (5434) and Ledger (5435).
+services:
+  limits-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: limits_db
+      POSTGRES_USER: limits_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env (copy .env.example)}
+    ports:
+      - "5436:5432"
+    volumes:
+      - limits-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U limits_user -d limits_db"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  limits-db-data:

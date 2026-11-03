@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Money Transfer – Live Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">₹</span>
+    <div>
+      <h1>Money Transfer – Live Demo</h1>
+      <p class="sub">Five microservices, driven from one page. Every call below is a real REST call.</p>
+    </div>
+  </div>
+  <div id="health-strip" class="health-strip" aria-label="Service health"></div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="overview" class="active">Overview</button>
+  <button role="tab" data-tab="transfer">Make a transfer</button>
+  <button role="tab" data-tab="c1">Challenge 1 · Concurrency</button>
+  <button role="tab" data-tab="c2">Challenge 2 · Idempotency</button>
+  <button role="tab" data-tab="c3">Challenge 3C · Saga</button>
+  <button role="tab" data-tab="resilience">Slow / failing dependency</button>
+  <button role="tab" data-tab="rules">Business rules</button>
+  <button role="tab" data-tab="log">Request log <span id="log-count" class="pill">0</span></button>
+</nav>
+
+<main>
+
+  <!-- ============================== OVERVIEW ============================== -->
+  <section id="tab-overview" class="tab active">
+    <div class="grid two">
+      <div class="card">
+        <div class="card-head">
+          <h2>Services</h2>
+          <button class="ghost" id="health-refresh">Refresh</button>
+        </div>
+        <p class="hint">Each service has its own database. This page reaches them through the UI service on port 8080.</p>
+        <div class="scroll"><table class="table" id="health-table"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <h2>Open an account</h2>
+        <p class="hint">Accounts are created in the Account service. Money only enters as an opening balance.</p>
+        <form id="open-form" class="form">
+          <label>Account ID <input name="accountId" required pattern="[A-Za-z0-9_-]{3,64}"></label>
+          <label>Holder name <input name="holderName" required value="Demo User"></label>
+          <label>Currency <input name="currency" required value="INR" maxlength="3"></label>
+          <label>Opening balance <input name="initialBalance" required type="number" min="0" step="0.01" value="10000"></label>
+          <div class="actions"><button type="submit">Open account</button></div>
+        </form>
+        <div id="open-result"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Accounts</h2>
+        <button class="ghost" id="accounts-refresh">Refresh</button>
+      </div>
+      <p class="hint"><b>Available</b> = balance minus money on hold for transfers still in progress.</p>
+      <div id="accounts"></div>
+    </div>
+
+    <div class="card" id="account-detail-card" hidden>
+      <div class="card-head">
+        <h2 id="account-detail-title">Account</h2>
+        <button class="ghost" id="account-detail-close">Close</button>
+      </div>
+      <div id="account-detail"></div>
+    </div>
+  </section>
+
+  <!-- ============================== TRANSFER ============================== -->
+  <section id="tab-transfer" class="tab">
+    <div class="grid two">
+      <div class="card">
+        <h2>Send money</h2>
+        <p class="hint">This is the only public call: <code>POST /api/v1/transfers</code> on the Transfer service, with an <code>Idempotency-Key</code>.</p>
+        <form id="transfer-form" class="form">
+          <label>From account <input name="sourceAccountId" list="account-ids" required value="ACC-1001"></label>
+          <label>To account <input name="destinationAccountId" list="account-ids" required value="ACC-2002"></label>
+          <label>Amount <input name="amount" required value="100.00"></label>
+          <label>Currency <input name="currency" required value="INR" maxlength="3"></label>
+          <label class="wide">Idempotency-Key
+            <span class="inline">
+              <input name="key" required>
+              <button type="button" class="ghost" id="new-key">New key</button>
+            </span>
+          </label>
+          <div class="actions">
+            <button type="submit">Send transfer</button>
+            <button type="button" class="secondary" id="send-again">Send again with the same key</button>
+          </div>
+        </form>
+        <datalist id="account-ids"></datalist>
+      </div>
+      <div class="card">
+        <h2>Answer</h2>
+        <div id="transfer-result" class="empty">Send a transfer to see the answer here.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Trace a transfer across all five services</h2>
+        <span class="inline">
+          <input id="trace-id" placeholder="transferId" size="40">
+          <button class="ghost" id="trace-go">Trace</button>
+        </span>
+      </div>
+      <div id="trace" class="empty">The last transfer you send is traced here automatically.</div>
+    </div>
+  </section>
+
+  <!-- ============================== CHALLENGE 1 ============================== -->
+  <section id="tab-c1" class="tab">
+    <div class="card intro">
+      <h2>Challenge 1 · A contended resource is never over-allocated</h2>
+      <p>Many requests try to take money from the same account at the same moment. Without care, they all read the same balance, all pass the check, and the account goes negative.
+        Here a fresh account is opened, then all requests are fired <b>at once</b>. Each one asks to set money aside (a hold).
+        The Account service uses <b>one conditional SQL UPDATE</b> (<code>… WHERE available &gt;= amount</code>), so exactly as many succeed as the balance allows.</p>
+    </div>
+    <div class="grid two">
+      <div class="card">
+        <h2>Run it</h2>
+        <form id="c1-form" class="form">
+          <label>What is contended
+            <select name="mode">
+              <option value="account">Account balance (holds on the Account service)</option>
+              <option value="limits">Daily limit (reservations on the Limits service)</option>
+            </select>
+          </label>
+          <label>Starting balance or limit (₹) <input name="capacity" type="number" min="1" value="500"></label>
+          <label>Amount per request (₹) <input name="amount" type="number" min="1" value="100"></label>
+          <label>Requests fired at once <input name="count" type="number" min="1" max="100" value="25"></label>
+          <div class="actions"><button type="submit">Fire them all at once</button></div>
+        </form>
+        <p class="hint">Daily-limit mode: keep the number that can succeed at 10 or fewer, or the fraud rule F1 (10 transfers per minute) also refuses some.</p>
+      </div>
+      <div class="card">
+        <h2>Result</h2>
+        <div id="c1-result" class="empty">Nothing run yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CHALLENGE 2 ============================== -->
+  <section id="tab-c2" class="tab">
+    <div class="card intro">
+      <h2>Challenge 2 · Sending money is safe to repeat</h2>
+      <p>The customer's app may send the same request twice: a timeout, a retry, a double click. Each transfer carries an <code>Idempotency-Key</code>.
+        The Transfer service claims the key with a database primary key and remembers the answer, so a repeat gets the same answer and <b>no money moves twice</b>.
+        Each scenario opens a fresh account with ₹1,000 and sends to ACC-1001.</p>
+    </div>
+    <div class="grid two">
+      <div class="card scenario">
+        <h3>A · Retry after a lost answer</h3>
+        <p>Send ₹100, then send exactly the same request with the same key.</p>
+        <button data-c2="retry">Run</button>
+        <div class="out" id="c2-retry"></div>
+      </div>
+      <div class="card scenario">
+        <h3>B · Double click: identical requests at the same moment</h3>
+        <p>Fire <input id="c2-n" type="number" min="2" max="50" value="10" class="tiny"> identical requests with one key, all at once.</p>
+        <button data-c2="parallel">Run</button>
+        <div class="out" id="c2-parallel"></div>
+      </div>
+      <div class="card scenario">
+        <h3>C · Same key, different request</h3>
+        <p>Send ₹100, then reuse the key for ₹200. The second must be refused.</p>
+        <button data-c2="mismatch">Run</button>
+        <div class="out" id="c2-mismatch"></div>
+      </div>
+      <div class="card scenario">
+        <h3>D · No key at all</h3>
+        <p>A transfer without an <code>Idempotency-Key</code> header is refused before anything happens.</p>
+        <button data-c2="nokey">Run</button>
+        <div class="out" id="c2-nokey"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CHALLENGE 3C ============================== -->
+  <section id="tab-c3" class="tab">
+    <div class="card intro">
+      <h2>Challenge 3C · A failure halfway is undone</h2>
+      <p>A transfer touches four databases, so it cannot be one transaction. Transfer runs a <b>saga</b>: 1 reserve the limit, 2 hold the money, 3 post the ledger journal, 4 capture.
+        Here the Ledger is made to fail, so step 3 fails after its retries. Transfer must then <b>undo steps 2 and 1</b> in reverse order and leave nothing reserved.</p>
+    </div>
+    <div class="grid two">
+      <div class="card">
+        <div class="card-head">
+          <h2>Ledger fault switch</h2>
+          <button class="ghost" id="faults-refresh">Refresh</button>
+        </div>
+        <div id="faults"></div>
+        <div class="actions">
+          <button class="danger" id="faults-on">Make the Ledger fail</button>
+          <button class="secondary" id="faults-off">Ledger back to normal</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Run the failing transfer</h2>
+        <p class="hint">Opens a fresh account with ₹1,000, turns the Ledger failure on, sends ₹300, then checks every service.</p>
+        <label class="check"><input type="checkbox" id="c3-auto-off" checked> Turn the Ledger failure off afterwards</label>
+        <div class="actions"><button id="c3-run">Run Challenge 3C</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>What happened</h2>
+      <div id="c3-result" class="empty">Nothing run yet.</div>
+    </div>
+  </section>
+
+  <!-- ============================== RESILIENCE ============================== -->
+  <section id="tab-resilience" class="tab">
+    <div class="card intro">
+      <h2>A dependency that can be slow or fail</h2>
+      <p>The SMS provider is simulated by our Notification service and can be made slow or failing. Transfer sends the SMS <b>in the background</b> after the transfer is COMPLETED,
+        and retries when the provider fails. A failed SMS never fails a transfer, and the same transfer is never notified twice.</p>
+    </div>
+    <div class="grid two">
+      <div class="card">
+        <div class="card-head">
+          <h2>SMS provider</h2>
+          <button class="ghost" id="provider-refresh">Refresh</button>
+        </div>
+        <div id="provider"></div>
+        <div class="actions wrap">
+          <button class="secondary" data-provider="ok">Normal</button>
+          <button class="secondary" data-provider="failnext">Next 2 sends fail</button>
+          <button class="secondary" data-provider="flaky">Half fail at random</button>
+          <button class="danger" data-provider="down">Every send fails</button>
+          <button class="secondary" data-provider="slow">Slow (5 s per send)</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Send a transfer and watch the SMS</h2>
+        <p class="hint">Opens a fresh account with ₹1,000, sends ₹50 and follows the notification for 20 seconds.</p>
+        <div class="actions"><button id="res-run">Send and watch</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>What happened</h2>
+      <div id="res-result" class="empty">Nothing run yet.</div>
+    </div>
+  </section>
+
+  <!-- ============================== RULES ============================== -->
+  <section id="tab-rules" class="tab">
+    <div class="card">
+      <div class="card-head">
+        <h2>Business rules, each tried against the running system</h2>
+        <button id="rules-all">Run all</button>
+      </div>
+      <p class="hint">Each row sends a request that breaks one rule and checks the exact status and error code. Scenarios that change data use fresh accounts.</p>
+      <table class="table" id="rules-table">
+        <thead><tr><th>Rule</th><th>Scenario</th><th>Expected</th><th>Actual</th><th></th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================== LOG ============================== -->
+  <section id="tab-log" class="tab">
+    <div class="card">
+      <div class="card-head">
+        <h2>Every call this page made</h2>
+        <button class="ghost" id="log-clear">Clear</button>
+      </div>
+      <p class="hint">Click a row to see the request and the answer. The <code>X-Request-ID</code> is sent to the service, so the same call can be found in its JSON logs.</p>
+      <table class="table log" id="log-table">
+        <thead><tr><th>Time</th><th>Service</th><th>Call</th><th>Status</th><th>ms</th><th>X-Request-ID</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

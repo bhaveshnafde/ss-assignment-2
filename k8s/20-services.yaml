@@ -1,0 +1,430 @@
+# The six application services: a Deployment and a Service each.
+# Images are built into Minikube first (see k8s/README.md), so imagePullPolicy is IfNotPresent.
+---
+# account-service · 2 replicas: stateless; the atomic SQL UPDATE keeps money correct across pods (scaling demo)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-service
+  namespace: money-transfer
+  labels: { app: account-service, tier: app }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: account-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: account-service, tier: app }
+    spec:
+      initContainers:
+        # Wait until this service's database accepts connections, so the service starts cleanly
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h account-db -p 5432; do echo waiting for account-db; sleep 2; done"]
+      containers:
+        - name: account-service
+          image: money-transfer/account-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://account-db:5432/account_db
+            - name: DB_USERNAME
+              value: account_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: account-db-password }
+            - name: HOLD_STRATEGY
+              value: "atomic"
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8081 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-service
+  namespace: money-transfer
+  labels: { app: account-service }
+spec:
+  type: ClusterIP
+  selector: { app: account-service }
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+# ledger-service · 1 replica: its demo fault switch is held in memory per pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-service
+  namespace: money-transfer
+  labels: { app: ledger-service, tier: app }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ledger-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: ledger-service, tier: app }
+    spec:
+      initContainers:
+        # Wait until this service's database accepts connections, so the service starts cleanly
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h ledger-db -p 5432; do echo waiting for ledger-db; sleep 2; done"]
+      containers:
+        - name: ledger-service
+          image: money-transfer/ledger-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://ledger-db:5432/ledger_db
+            - name: DB_USERNAME
+              value: ledger_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: ledger-db-password }
+            - name: ADMIN_ENDPOINTS_ENABLED
+              value: "true"
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8083 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8083 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8083 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-service
+  namespace: money-transfer
+  labels: { app: ledger-service }
+spec:
+  type: ClusterIP
+  selector: { app: ledger-service }
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+# limits-service · 1 replica (stateless, can be scaled like Account)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: limits-service
+  namespace: money-transfer
+  labels: { app: limits-service, tier: app }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: limits-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: limits-service, tier: app }
+    spec:
+      initContainers:
+        # Wait until this service's database accepts connections, so the service starts cleanly
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h limits-db -p 5432; do echo waiting for limits-db; sleep 2; done"]
+      containers:
+        - name: limits-service
+          image: money-transfer/limits-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://limits-db:5432/limits_db
+            - name: DB_USERNAME
+              value: limits_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: limits-db-password }
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8084 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8084 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8084 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: limits-service
+  namespace: money-transfer
+  labels: { app: limits-service }
+spec:
+  type: ClusterIP
+  selector: { app: limits-service }
+  ports:
+    - port: 8084
+      targetPort: 8084
+---
+# notification-service · 1 replica: its simulated-provider switches are held in memory per pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: money-transfer
+  labels: { app: notification-service, tier: app }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notification-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: notification-service, tier: app }
+    spec:
+      initContainers:
+        # Wait until this service's database accepts connections, so the service starts cleanly
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h notification-db -p 5432; do echo waiting for notification-db; sleep 2; done"]
+      containers:
+        - name: notification-service
+          image: money-transfer/notification-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://notification-db:5432/notification_db
+            - name: DB_USERNAME
+              value: notification_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: notification-db-password }
+            - name: ADMIN_ENDPOINTS_ENABLED
+              value: "true"
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8085 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8085 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8085 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: money-transfer
+  labels: { app: notification-service }
+spec:
+  type: ClusterIP
+  selector: { app: notification-service }
+  ports:
+    - port: 8085
+      targetPort: 8085
+---
+# transfer-service · 1 replica: its recovery job assumes a single instance (see report, limitations)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transfer-service
+  namespace: money-transfer
+  labels: { app: transfer-service, tier: app }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: transfer-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: transfer-service, tier: app }
+    spec:
+      initContainers:
+        # Wait until this service's database accepts connections, so the service starts cleanly
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h transfer-db -p 5432; do echo waiting for transfer-db; sleep 2; done"]
+      containers:
+        - name: transfer-service
+          image: money-transfer/transfer-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://transfer-db:5432/transfer_db
+            - name: DB_USERNAME
+              value: transfer_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: transfer-db-password }
+            - name: ACCOUNT_SERVICE_URL
+              value: "http://account-service:8081"
+            - name: LEDGER_SERVICE_URL
+              value: "http://ledger-service:8083"
+            - name: LIMITS_SERVICE_URL
+              value: "http://limits-service:8084"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8085"
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8082 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8082 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8082 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transfer-service
+  namespace: money-transfer
+  labels: { app: transfer-service }
+spec:
+  type: NodePort
+  selector: { app: transfer-service }
+  ports:
+    - port: 8082
+      targetPort: 8082
+      nodePort: 30082
+---
+# ui-service · 1 replica: demo dashboard
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-service
+  namespace: money-transfer
+  labels: { app: ui-service, tier: app }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ui-service }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: ui-service, tier: app }
+    spec:
+      containers:
+        - name: ui-service
+          image: money-transfer/ui-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TRANSFER_SERVICE_URL
+              value: "http://transfer-service:8082"
+            - name: ACCOUNT_SERVICE_URL
+              value: "http://account-service:8081"
+            - name: LEDGER_SERVICE_URL
+              value: "http://ledger-service:8083"
+            - name: LIMITS_SERVICE_URL
+              value: "http://limits-service:8084"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8085"
+            - name: LOG_FORMAT
+              value: "logstash"
+          # Java takes a while to start: liveness checks only begin once the startup probe has passed
+          startupProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-service
+  namespace: money-transfer
+  labels: { app: ui-service }
+spec:
+  type: NodePort
+  selector: { app: ui-service }
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080

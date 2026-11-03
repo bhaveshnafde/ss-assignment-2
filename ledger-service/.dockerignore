@@ -1,0 +1,15 @@
+# Keep the build context small and keep secrets out of the image
+target/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+evidence/
+scripts/
+dev-stubs/
+docker-compose*.yml
+Dockerfile
+README.md
+*.log

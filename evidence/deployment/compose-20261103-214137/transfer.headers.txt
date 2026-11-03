@@ -1,0 +1,8 @@
+HTTP/1.1 201 
+X-Request-ID: deploy-check-1793722298
+Idempotent-Replayed: false
+Location: /api/v1/transfers/88942917-ad2f-4ffe-bffe-a790b94be570
+Content-Type: application/json
+Content-Length: 291
+Date: Tue, 03 Nov 2026 16:11:39 GMT
+

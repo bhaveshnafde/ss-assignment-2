@@ -1,0 +1,57 @@
+# Every value can be overridden with the environment variable named in ${...}.
+# Defaults are for local development; see .env.example.
+
+server:
+  port: ${PORT:8083}
+
+spring:
+  config:
+    # Local runs read KEY=value lines from a .env file next to pom.xml (copy .env.example).
+    # That file is in .gitignore and .dockerignore, so no password is ever committed or baked into an image.
+    import: optional:file:.env[.properties]
+  application:
+    name: ledger-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/ledger_db}
+    username: ${DB_USERNAME:ledger_user}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (src/main/resources/db/migration)
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    # common = tables for every database; {vendor} = PostgreSQL-only integrity triggers
+    # (the H2 test database has no such folder, so it gets the tables only)
+    locations: classpath:db/migration/common,classpath:db/migration/{vendor}
+
+ledger:
+  # Fault switch for the Challenge 3C demo. true = POST /journals answers 503, so the Transfer
+  # saga fails at step 3 and undoes steps 1 and 2. Reversals keep working, so the undo succeeds.
+  fail-posts: ${LEDGER_FAIL:false}
+  # Slow-response demo: wait this long AFTER saving a new journal before answering.
+  # Above Transfer's read timeout (3000 ms), Transfer retries and gets the saved journal back (200).
+  post-delay-ms: ${LEDGER_DELAY_MS:0}
+  # Lets the two settings above be changed at runtime via /api/v1/admin/faults (demo convenience)
+  admin-enabled: ${ADMIN_ENDPOINTS_ENABLED:true}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Structured JSON logs; MDC field requestId is included in every line.
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:logstash}
+  level:
+    com.moneytransfer: ${LOG_LEVEL:INFO}

@@ -1,0 +1,8 @@
+HTTP/1.1 201 
+X-Request-ID: evidence-sms-1793727179
+Idempotent-Replayed: false
+Location: /api/v1/transfers/4c558c09-0995-4846-b135-7a6a8725890f
+Content-Type: application/json
+Content-Length: 290
+Date: Tue, 03 Nov 2026 17:32:59 GMT
+

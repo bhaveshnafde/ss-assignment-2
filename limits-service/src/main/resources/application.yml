@@ -1,0 +1,53 @@
+# Every value can be overridden with the environment variable named in ${...}.
+# Defaults are for local development; see .env.example.
+
+server:
+  port: ${PORT:8084}
+
+spring:
+  config:
+    # Local runs read KEY=value lines from a .env file next to pom.xml (copy .env.example).
+    # That file is in .gitignore and .dockerignore, so no password is ever committed or baked into an image.
+    import: optional:file:.env[.properties]
+  application:
+    name: limits-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5436/limits_db}
+    username: ${DB_USERNAME:limits_user}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:30}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (src/main/resources/db/migration)
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+limits:
+  # BR3: default total an account may send per day (UTC calendar day), including pending transfers
+  daily-limit: ${DAILY_LIMIT:200000.00}
+  # BR1: default largest single transfer
+  per-transfer-limit: ${PER_TRANSFER_LIMIT:100000.00}
+  # F1 (fraud): at most this many transfers per account within the window. 0 switches the rule off.
+  velocity-max-transfers: ${VELOCITY_MAX_TRANSFERS:10}
+  velocity-window: ${VELOCITY_WINDOW_SECONDS:60}s
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Structured JSON logs; MDC field requestId is included in every line.
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:logstash}
+  level:
+    com.moneytransfer: ${LOG_LEVEL:INFO}

@@ -1,0 +1,28 @@
+# Every value can be overridden with the environment variable named in ${...}.
+
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: ui-service
+
+ui:
+  # The page can reach only these five services. Same variable names the Transfer service uses.
+  services:
+    transfer: ${TRANSFER_SERVICE_URL:http://localhost:8082}
+    account: ${ACCOUNT_SERVICE_URL:http://localhost:8081}
+    ledger: ${LEDGER_SERVICE_URL:http://localhost:8083}
+    limits: ${LIMITS_SERVICE_URL:http://localhost:8084}
+    notification: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+  # A service that is not running is reported after this long
+  connect-timeout: ${UI_CONNECT_TIMEOUT_MS:1000}ms
+  # A transfer can take a while when Transfer retries and undoes steps, so wait generously
+  request-timeout: ${UI_REQUEST_TIMEOUT_MS:60000}ms
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:logstash}
+  level:
+    com.moneytransfer: ${LOG_LEVEL:INFO}

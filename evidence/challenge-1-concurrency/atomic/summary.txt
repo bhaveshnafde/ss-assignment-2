@@ -1,0 +1,17 @@
+== Challenge 1: concurrency (atomic)   2026-11-03T23:02:49+05:30
+Account RACE-20261103-230249 opened with 500 INR: HTTP 201
+Account RACE-20261103-230249-D opened with 0 INR: HTTP 201
+Firing 25 holds of 100 at the same moment; money exists for 5.
+
+succeeded (201): 5
+refused   (409): 20
+other:           0
+
+== Account afterwards (balance unchanged; available + onHold = balance)
+{"accountId":"RACE-20261103-230249","holderName":"Race test","currency":"INR","balance":500.00,"available":0.00,"onHold":500.00,"status":"ACTIVE","createdAt":"2026-11-03T17:32:49.636146Z","updatedAt":"2026-11-03T17:32:50.293746Z"}
+
+== Holds recorded: 5
+
+Check in the database too:
+  SELECT id, balance, available FROM accounts WHERE id = 'RACE-20261103-230249';
+  SELECT count(*), sum(amount) FROM holds WHERE source_account_id = 'RACE-20261103-230249';

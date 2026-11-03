@@ -1,0 +1,1 @@
+[{"journalId":"J-000001","transferId":"88942917-ad2f-4ffe-bffe-a790b94be570","type":"TRANSFER","currency":"INR","reverses":null,"reversedBy":null,"postedAt":"2026-11-03T16:11:39.436898Z","entries":[{"accountId":"ACC-1001","direction":"DEBIT","amount":100.00},{"accountId":"ACC-2002","direction":"CREDIT","amount":100.00}]}]

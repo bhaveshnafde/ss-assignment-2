@@ -1,0 +1,8 @@
+HTTP/1.1 201 
+X-Request-ID: idem-demo-1793727174-parallel-09
+Idempotent-Replayed: true
+Location: /api/v1/transfers/01f5fdd9-0d05-485d-a658-35601f38c6f2
+Content-Type: application/json
+Content-Length: 285
+Date: Tue, 03 Nov 2026 17:32:54 GMT
+

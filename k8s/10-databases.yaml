@@ -1,0 +1,311 @@
+# One PostgreSQL per service: a StatefulSet with its own volume, and a Service named <name>-db.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transfer-db
+  namespace: money-transfer
+  labels: { app: transfer-db, tier: database }
+spec:
+  selector: { app: transfer-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: transfer-db
+  namespace: money-transfer
+  labels: { app: transfer-db, tier: database }
+spec:
+  serviceName: transfer-db
+  replicas: 1
+  selector:
+    matchLabels: { app: transfer-db }
+  template:
+    metadata:
+      labels: { app: transfer-db, tier: database }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: transfer_db
+            - name: POSTGRES_USER
+              value: transfer_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: transfer-db-password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U transfer_user -d transfer_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-db
+  namespace: money-transfer
+  labels: { app: account-db, tier: database }
+spec:
+  selector: { app: account-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: account-db
+  namespace: money-transfer
+  labels: { app: account-db, tier: database }
+spec:
+  serviceName: account-db
+  replicas: 1
+  selector:
+    matchLabels: { app: account-db }
+  template:
+    metadata:
+      labels: { app: account-db, tier: database }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: account_db
+            - name: POSTGRES_USER
+              value: account_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: account-db-password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U account_user -d account_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-db
+  namespace: money-transfer
+  labels: { app: ledger-db, tier: database }
+spec:
+  selector: { app: ledger-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ledger-db
+  namespace: money-transfer
+  labels: { app: ledger-db, tier: database }
+spec:
+  serviceName: ledger-db
+  replicas: 1
+  selector:
+    matchLabels: { app: ledger-db }
+  template:
+    metadata:
+      labels: { app: ledger-db, tier: database }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: ledger_db
+            - name: POSTGRES_USER
+              value: ledger_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: ledger-db-password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U ledger_user -d ledger_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: limits-db
+  namespace: money-transfer
+  labels: { app: limits-db, tier: database }
+spec:
+  selector: { app: limits-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: limits-db
+  namespace: money-transfer
+  labels: { app: limits-db, tier: database }
+spec:
+  serviceName: limits-db
+  replicas: 1
+  selector:
+    matchLabels: { app: limits-db }
+  template:
+    metadata:
+      labels: { app: limits-db, tier: database }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: limits_db
+            - name: POSTGRES_USER
+              value: limits_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: limits-db-password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U limits_user -d limits_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-db
+  namespace: money-transfer
+  labels: { app: notification-db, tier: database }
+spec:
+  selector: { app: notification-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: notification-db
+  namespace: money-transfer
+  labels: { app: notification-db, tier: database }
+spec:
+  serviceName: notification-db
+  replicas: 1
+  selector:
+    matchLabels: { app: notification-db }
+  template:
+    metadata:
+      labels: { app: notification-db, tier: database }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: notification_db
+            - name: POSTGRES_USER
+              value: notification_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: notification-db-password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U notification_user -d notification_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
